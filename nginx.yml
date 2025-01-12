@@ -1,0 +1,67 @@
+---
+ - hosts: all
+   become: yes
+   remote_user: ubuntu
+   tasks:
+
+  # upload ssh key                
+   - authorized_key:
+       user: ubuntu
+       state: present
+       manage_dir: yes
+       key: "{{ lookup('file', '/Users/sravankumar/.ssh/id_rsa.pub') }}"
+
+   - name: Update apt cache and Install nginx
+     apt: 
+      name: nginx
+      state: present
+      update_cache: yes
+
+   - name: Create directory for static content and templates
+     file:
+      path: /var/www/html/application/templates
+      state: directory
+      mode: 0755
+  
+  # - name: Create directory for templates
+  #   file:
+  #    path: /var/www/html/application/templates
+  #    state: directory
+  #    mode: 0755
+
+   - name: Copy templates to the respective directory on remote server
+     copy:
+        src: "index.html.j2"                    #jinja template
+        dest: /var/www/html/application/templates
+        mode: 0755
+
+   - name: Copy website files to server's document root
+     copy:
+        src: /Users/sravankumar/template/
+        dest: /var/www/html/application/         
+        mode: 0755
+        follow: true
+
+   - name: Copy website files to default Nginx server location
+     copy:
+        src: /var/www/html/application/
+        dest: /var/www/html/
+        mode: 0755
+        remote_src: true
+
+   - name: Enable default Nginx website
+     file:
+        src: /etc/nginx/sites-available/default
+        path: /etc/nginx/sites-enabled/default
+        state: link
+
+   - name: Restart Nginx
+     service:
+        name: nginx
+        state: restarted
+
+   - name: Allow all access to tcp port 80
+     community.general.ufw:
+      rule: allow
+      port: '80'
+      proto: tcp
